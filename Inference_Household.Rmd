@@ -148,4 +148,5 @@ summary(model_1)
 confint(model_1) 
 ```
 
-There is strong evidence that people living in apartment pay less on electricity than those living in houses (p-value < 2.2e-16). With 95% confidence, the mean of electricity cost for people living in houses is between 15.51 and 22.52 dollars greater than people living in apartments. 
+There is strong evidence that people living in apartment pay less on electricity than those living in houses (p-value < 2.2e-16). 
+With 95% confidence, the mean of electricity cost for people living in houses is between 15.51 and 22.52 dollars greater than people living in apartments. 
