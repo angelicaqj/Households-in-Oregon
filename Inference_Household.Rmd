@@ -1,0 +1,151 @@
+---
+title: "Inference Project"
+author: "Angelicaqj"
+date: "3/7/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(broom)
+library(ggplot2)
+library(leaps)
+library(dplyr)
+library(patchwork)
+knitr::opts_chunk$set(echo = FALSE, fig.width = 8,fig.height = 5)
+```
+
+The file OR_house.csv contains household level responses to the American Community Survey for households in Oregon. Technically this is a Public Use Microdata Sample (PUMS) from the 2015 1-year survey. The data were obtained from http://www2.census.gov/programs-surveys/acs/data/pums/2015/1-Year/. 
+
+A subset of variables is provided and only households that have at least one person, pay for their electricity, and are not group accommodation. You may assume this is a random sample of all such households in Oregon. The variable descriptions can be found in PUMS_Data_Dictionary_2011_2015.txt.
+
+
+```{r}
+# reading the csv file
+df_1 <- read.csv("OR_house.csv")
+
+# adding a new column with three categories (Apartment, House, Other)
+df_1$Housing_Type <- 
+  ifelse(grepl("apartment", df_1$BLD, ignore.case = T), "Apartment", 
+         ifelse(grepl("house", df_1$BLD, ignore.case = T), "House", "Other"))
+
+#head(df_1)
+#str(final_data)
+```
+
+## Explanatory Strategy
+
+**Explanatory Problem:** Do people living in apartments pay less on electricity than those living in houses? How much? Make sure to adjust for (at least) the number of bedrooms and number of occupants in the household.
+
+Since the primary goal is to answer if there is any difference in electricity cost between the people living in apartments and the people living in houses, an inferential model could be the following:
+
+$$ ELEP_i = \beta_0 + \beta_1{HousingType} + \beta_2{BDSP}_i + \beta_3{NP}_i + \epsilon_i $$
+
+
+**Description of the strategy**
+
+1. Exploratory Analysis by looking at the relationship between the response variable and one of the explanatory variables.
+
+2. Fit 2 linear models where electrical cost is the response variable. 
+- Model 1 is the full model. It is including the number of bedrooms, number of occupants, and people living in apartments or houses as explanatory variables. 
+- Model 2 is the reduced model. It is including only people living in apartments or houses as the explanatory variable.
+
+
+3. Diagnostic of the residuals with the most complicated model, in this case, model_1.
+
+
+4. Comparing the 2 models performing analysis of variance to see if there is a significant difference between the 2 models.
+
+
+5. Proceeding with inference to answer the question of interest if there is evidence that people living in apartments pay less on electricity than those living in houses.
+
+
+**1. Exploratory Analysis**
+
+```{r}
+
+ggplot(data = df_1, aes(x = BDSP, y = ELEP, color = Housing_Type)) + 
+  geom_smooth(formula = 'y ~ x', method = "lm") +
+  scale_color_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks = seq(0, 7, 1)) +
+  labs(title = "Electricity Cost Increases as the Number of Bedrooms Increases",
+       subtitle = "Based on households in Oregon in 2015",
+       y = "Electricity Cost (dollars)", x = "Number of Bedrooms", color = "Housing Type") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_classic() +
+  theme(
+    plot.title = element_text(color = "black", size = 13, face = "bold", hjust = 0.5)
+  )
+  
+
+ggplot(data = df_1, aes(x = BDSP, y = ELEP, fill = Housing_Type)) + 
+  geom_boxplot(na.rm = TRUE) + 
+  facet_wrap(~ BDSP, scale="free") +
+  ylim(0,400) +
+  labs(title = "Electricity Cost Regarding the Housing type and the Number of Bedrooms",
+       subtitle = "Each facet represents the number of bedrooms, from 0 to 7.",
+       y = "Electricity Cost (dollars)", x = "", fill = "Housing Type") +
+  scale_fill_brewer(palette = "Dark2") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = "top",
+    legend.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(color = "black", size = 13, face = "bold", hjust = 0))
+
+#ggplot(data = df_1, aes(x = NP, y = ELEP, fill = Housing_Type)) + geom_boxplot() + facet_wrap(~NP, scale="free")
+```
+
+Both plots are indicating a positive relationship between the response variable and the explanatory variable for each visualization. 
+
+
+**2. Fit 2 Models**
+
+```{r}
+model_1 <- lm(ELEP ~ Housing_Type + BDSP + NP, data = df_1)
+
+model_2 <- lm(ELEP ~ Housing_Type, data = df_1)
+```
+
+**3. Check fit**
+
+```{r}
+# Diagnostic
+diagnostic_model <- augment(model_1, data = df_1)
+
+# plotting the residuals with the fitted model and the explanatory variables
+p1 <- qplot(.fitted, .resid, data = diagnostic_model)
+p2 <- qplot(BDSP, .resid, data = diagnostic_model)
+p3 <- qplot(NP, .resid, data = diagnostic_model)
+p4 <- qplot(Housing_Type, .resid, data = diagnostic_model)
+
+p1
+p2/p3/p4
+```
+
+The first plot by comparing the residuals with the fitted values, it seems that there is a line on the top that can be a cluster related with one of the variables. 
+
+
+**4. Compare the 2 models**
+
+```{r}
+# Extra sum of squares F-test procedure
+anova(model_1, model_2)
+
+# model comparison criteria
+BIC(model_1, model_2)
+```
+
+Since the analysis of variance show us that the F-statistic is larger and the p-value is significantly small, there is enough evidence that model_1 is better to proceed with the inferential analysis.
+
+
+**5. Proceed with Inference**
+
+```{r}
+summary(model_1)
+
+#confidence intervals
+confint(model_1) 
+```
+
+There is strong evidence that people living in apartment pay less on electricity than those living in houses (p-value < 2.2e-16). With 95% confidence, the mean of electricity cost for people living in houses is between 15.51 and 22.52 dollars greater than people living in apartments. 
